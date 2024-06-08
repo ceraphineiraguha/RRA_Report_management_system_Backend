@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework_simplejwt.token_blacklist',
     'userApp',
+    'reportApp',
 ]
 
 MIDDLEWARE = [
@@ -155,3 +156,19 @@ CORS_ALLOWED_ORIGINS = [
 DEFAULT_FROM_EMAIL = 'no-reply'
 AUTH_USER_MODEL = 'userApp.CustomUser'
 
+
+
+# settings.py
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG',
+    },
+}

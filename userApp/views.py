@@ -115,6 +115,7 @@ class PasswordResetView(APIView):
             email = serializer.validated_data.get('email')
             phone = serializer.validated_data.get('phone')
             
+            
             user = None
             if username:
                 user = CustomUser.objects.filter(username=username).first()
@@ -124,7 +125,8 @@ class PasswordResetView(APIView):
                 user = CustomUser.objects.filter(phone=phone).first()
 
             if user:
-                new_password = self.generate_random_string(6)
+                # new_password = self.generate_random_string(6)
+                new_password = request.data.get('new_password')
                 user.set_password(new_password)
                 user.save()
 
