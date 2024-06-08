@@ -296,3 +296,8 @@ class ReportDownloadAllExcelView(generics.GenericAPIView):
 
         response.write(excel_data)
         return response
+
+
+'''
+    reports done to be developed with the reports
+'''
