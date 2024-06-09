@@ -1,14 +1,9 @@
-# user/urls.py
-"""
-This file contains the URL routing for user-related views.
-"""
-
 from django.urls import path
 from .views import (
     index, SignupView, LoginView, UserListView, UserDetailView,
     UserUpdateView, UserDeleteView, UserByUsernameView, UserByEmailView,
     UserByPhoneView, UserByFirstNameView, UserByLastNameView, PasswordResetView,
-    UpdateUsernameView, UserCountView, UserTrendView
+    UpdateUsernameView, UserCountView, UserTrendView, UserDownloadPDFView, UserDownloadExcelView
 )
 
 urlpatterns = [
@@ -28,4 +23,6 @@ urlpatterns = [
     path('update-username/', UpdateUsernameView.as_view(), name='update-username'),
     path('user-count/', UserCountView.as_view(), name='user-count'),
     path('user-trends/', UserTrendView.as_view(), name='user-trends'),
+    path('users/download/pdf/', UserDownloadPDFView.as_view(), name='user-download-pdf'),
+    path('users/download/excel/', UserDownloadExcelView.as_view(), name='user-download-excel'),
 ]
