@@ -1,7 +1,0 @@
-tests/
-docs/
-*.md
-*.gitignore
-__pycache__/
-*.pyc
-node_modules/

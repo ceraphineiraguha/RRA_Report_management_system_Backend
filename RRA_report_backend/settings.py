@@ -4,9 +4,17 @@
 from datetime import timedelta
 from pathlib import Path
 from django.core.mail import send_mail
+from pathlib import Path
+import dj_database_url
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+env = environ.Env()
+environ.Env.read_env()
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -15,9 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-n2&6_j(6s!s)=&o)dq_+4x6)l5_uz9m8j95-)l63@p^k=$5bu$'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ['.vercel.app']
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 
@@ -151,6 +159,11 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:5000',
     'http://localhost:5500',
 ]
+
+
+
+CORS_ALLOW_ALL_ORGINS = True
+
 
 # Configure email settings (replace these with your actual email settings)
 DEFAULT_FROM_EMAIL = 'no-reply'
