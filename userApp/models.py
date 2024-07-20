@@ -1,16 +1,9 @@
-# users/models.py
-'''
-    This class is the one that connects to database to create table,
-    it means that the name of a class available here will be the same name of table name in the database
-
-'''
-
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
 
 class CustomUserManager(BaseUserManager):
-    def create_user(self, first_name, last_name, username, email, phone, password=None):
+    def create_user(self, first_name, last_name, username, email, phone, role, password=None, created_by=None):
         if not email:
             raise ValueError("Users must have an email address")
         if not phone:
@@ -23,8 +16,9 @@ class CustomUserManager(BaseUserManager):
             email=email,
             phone=phone,
             username=username,
-            role='user',
-            created_at=timezone.now()
+            role=role,
+            created_at=timezone.now(),
+            created_by=created_by
         )
         
         user.set_password(password)
@@ -33,11 +27,12 @@ class CustomUserManager(BaseUserManager):
 
     def create_superuser(self, first_name, last_name, username, email, phone, password=None):
         user = self.create_user(
-            first_name,
-            last_name,
-            email,
-            phone,
-            username,
+            first_name=first_name,
+            last_name=last_name,
+            username=username,
+            email=email,
+            phone=phone,
+            role='admin',  # assuming role for superuser is 'admin'
             password=password
         )
         user.is_admin = True
@@ -45,20 +40,15 @@ class CustomUserManager(BaseUserManager):
         return user
 
 class CustomUser(AbstractBaseUser):
-    ROLE_CHOICES = (
-        ('user', 'User'),
-        ('unit user', 'Unit User'),
-        ('head of department', 'Head of Department'),
-        ('head of division', 'Head of Division'),
-    )
 
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     username = models.CharField(max_length=50, unique=True)
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=15, unique=True)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user')
+    role = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_users')
     
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)

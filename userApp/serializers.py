@@ -1,4 +1,3 @@
-# user/serializers.py
 """
 This file contains serializers for the CustomUser model.
 """
@@ -6,17 +5,42 @@ This file contains serializers for the CustomUser model.
 from rest_framework import serializers
 from .models import CustomUser
 
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'phone', 'role', 'created_at']
-        read_only_fields = ['id', 'username', 'role', 'created_at']
+        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'phone', 'role', 'created_at', 'created_by']
+        read_only_fields = ['id', 'username', 'created_at', 'created_by', 'phone']
+
+
 
 class SignupSerializer(serializers.ModelSerializer):
+    created_by = serializers.HiddenField(default=serializers.CurrentUserDefault())
+
     class Meta:
         model = CustomUser
-        fields = ['first_name', 'last_name', 'email', 'phone']
-    
+        fields = ['first_name', 'last_name', 'email', 'phone', 'role', 'created_by']
+
+    def validate_phone(self, value):
+        if not value.startswith(('078', '079', '072', '073')) or len(value) != 10:
+            raise serializers.ValidationError("Phone number must start with 078, 079, 072, or 073 and be 10 digits long.")
+        if CustomUser.objects.filter(phone=value).exists():
+            raise serializers.ValidationError("Phone number is already registered.")
+        return value
+
+    def validate_email(self, value):
+        if not value.endswith('@gmail.com'):
+            raise serializers.ValidationError("Email must end with @gmail.com.")
+        if CustomUser.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email is already registered.")
+        return value
+
+    def validate_role(self, value):
+        allowed_roles = ['unit user', 'head of division', 'head of department']
+        if value not in allowed_roles:
+            raise serializers.ValidationError("Role must be one of: 'unit user', 'head of division', 'head of department'.")
+        return value
+
     def create(self, validated_data):
         first_name = validated_data.get('first_name')
         last_name = validated_data.get('last_name')
@@ -24,26 +48,30 @@ class SignupSerializer(serializers.ModelSerializer):
         password = self.generate_random_string(6)
         email = validated_data.get('email')
         phone = validated_data.get('phone')
+        role = validated_data.get('role')
+        created_by = validated_data.get('created_by')
 
         user = CustomUser.objects.create_user(
             first_name=first_name,
             last_name=last_name,
-            username=username,  # Ensure username is set here
+            username=username,
             email=email,
             phone=phone,
-            password=password
+            role=role,
+            password=password,
+            created_by=created_by
         )
 
         # Send credentials via email
         self.send_credentials(email, username, password)
 
         return user
-    
+
     def generate_random_string(self, length):
         import random
         import string
         return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
-    
+
     def send_credentials(self, email, username, password):
         from django.core.mail import send_mail
         send_mail(
@@ -53,7 +81,9 @@ class SignupSerializer(serializers.ModelSerializer):
             [email],
             fail_silently=False,
         )
-
+       
+             
+        
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
@@ -67,3 +97,32 @@ class UpdateUsernameSerializer(serializers.Serializer):
     email = serializers.EmailField(required=False, allow_blank=True)
     phone = serializers.CharField(required=False, allow_blank=True)
     new_username = serializers.CharField()
+
+
+
+
+class LogoutSerializer(serializers.Serializer):
+    refresh_token = serializers.CharField()
+    
+    
+    
+    
+class CustomUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'first_name', 'last_name', 'username', 'email', 'phone', 'role', 'created_at', 'created_by']
+        read_only_fields = ['created_at', 'created_by']
+
+
+
+
+
+
+
+
+
+class ContactUsSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=100)
+    email = serializers.EmailField()
+    subject = serializers.CharField(max_length=200)
+    description = serializers.CharField()

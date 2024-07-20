@@ -1,22 +1,11 @@
-from io import BytesIO
-from rest_framework import generics, status
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.utils import timezone
-from datetime import timedelta
-from .models import Report
-from .serializers import ReportSerializer
-from userApp.models import CustomUser  # Assuming your CustomUser model is in a users app
-
-import logging
-
-# report/views.py
+from datetime import timedelta, timezone
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import Report
-from .serializers import ReportSerializer
+from .serializers import ReportSerializer, ReportUpdateSerializers
 from userApp.models import CustomUser
+
 
 class ReportCreateView(generics.CreateAPIView):
     serializer_class = ReportSerializer
@@ -44,17 +33,17 @@ class ReportCreateView(generics.CreateAPIView):
             title=title,
             description=description,
             level=level,
-            user=user  # Correct field name
+            created_by=user,
+            status=False  # Default status to False (pending)
         )
 
         # Serialize the report and return the response
         serializer = self.get_serializer(report)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-
 class ReportUpdateView(generics.UpdateAPIView):
     queryset = Report.objects.all()
-    serializer_class = ReportSerializer
+    serializer_class = ReportUpdateSerializers
     permission_classes = [IsAuthenticated]
 
 class ReportDeleteView(generics.DestroyAPIView):
@@ -67,13 +56,28 @@ class ReportListView(generics.ListAPIView):
     serializer_class = ReportSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        reports = super().get_queryset()
+        for report in reports:
+            if report.status == False:
+                report.status_display = 'pending'
+            if report.status == True:
+                report.status_display = 'approved'
+        return reports
+
 class ReportByLevelView(generics.ListAPIView):
     serializer_class = ReportSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         level = self.kwargs['level']
-        return Report.objects.filter(level=level)
+        reports = Report.objects.filter(level=level)
+        for report in reports:
+            if report.status == False:
+                report.status_display = 'pending'
+            else:
+                report.status_display = 'approved'
+        return reports
 
 class ReportByIdView(generics.RetrieveAPIView):
     queryset = Report.objects.all()
@@ -86,7 +90,15 @@ class ReportByTitleView(generics.ListAPIView):
 
     def get_queryset(self):
         title = self.kwargs['title']
-        return Report.objects.filter(title__icontains=title)
+        reports = Report.objects.filter(title__icontains=title)
+        for report in reports:
+            if report.status == False:
+                report.status_display = 'pending'
+            else:
+                report.status_display = 'approved'
+        return reports
+
+
 
 class ReportByUserView(generics.ListAPIView):
     serializer_class = ReportSerializer
@@ -94,9 +106,15 @@ class ReportByUserView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.kwargs['user']
-        return Report.objects.filter(user__username=user) | \
-               Report.objects.filter(user__email=user) | \
-               Report.objects.filter(user__phone=user)
+        reports = Report.objects.filter(created_by__username=user) | \
+                  Report.objects.filter(created_by__email=user) | \
+                  Report.objects.filter(created_by__phone=user)
+        for report in reports:
+            if report.status == False:
+                report.status_display = 'pending'
+            else:
+                report.status_display = 'approved'
+        return reports
 
 class ReportCountView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
@@ -127,6 +145,18 @@ class ReportTrendView(generics.GenericAPIView):
         }
         return Response(trends, status=status.HTTP_200_OK)
 
+class ReportApproveView(generics.UpdateAPIView):
+    queryset = Report.objects.all()
+    serializer_class = ReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def update(self, request, *args, **kwargs):
+        report = self.get_object()
+        report.status = True  # Set status to True (approved)
+        report.save()
+        serializer = self.get_serializer(report)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 
 from django.http import HttpResponse
@@ -138,21 +168,18 @@ from openpyxl.styles import Font, Alignment
 
 
 class ReportDownloadPDFView(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-
     def get(self, request, pk):
         report = Report.objects.get(pk=pk)
         response = HttpResponse(content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="report_{pk}.pdf"'
 
-        # Generate PDF content
         buffer = BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=letter)
         elements = []
 
         data = [
-            ["ID", "User", "Level", "Title", "Description", "Created Date"],
-            [report.id, report.user.username, report.level, report.title, report.description, report.created_date]
+            ["ID", "Created By", "Level", "Title", "Description", "Created Date"],
+            [report.id, report.created_by.username, report.level, report.title, report.description, report.created_date]
         ]
         table = Table(data)
         table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -171,29 +198,22 @@ class ReportDownloadPDFView(generics.GenericAPIView):
         response.write(pdf)
         return response
 
-
 class ReportDownloadExcelView(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-
     def get(self, request, pk):
         report = Report.objects.get(pk=pk)
         response = HttpResponse(content_type='application/vnd.ms-excel')
         response['Content-Disposition'] = f'attachment; filename="report_{pk}.xls"'
 
-        # Generate Excel content
         wb = Workbook()
         ws = wb.active
         ws.title = "Report"
 
-        # Headers
-        headers = ["ID", "User", "Level", "Title", "Description", "Created Date"]
+        headers = ["ID", "Created By", "Level", "Title", "Description", "Created Date"]
         ws.append(headers)
 
-        # Data
-        data = [report.id, report.user.username, report.level, report.title, report.description, report.created_date]
+        data = [report.id, report.created_by.username, report.level, report.title, report.description, report.created_date]
         ws.append(data)
 
-        # Set column width and alignment
         for col in ws.columns:
             max_length = 0
             column = col[0].column_letter
@@ -205,7 +225,6 @@ class ReportDownloadExcelView(generics.GenericAPIView):
             for cell in col:
                 cell.alignment = Alignment(horizontal='center', vertical='center')
 
-        # Save to buffer
         buffer = BytesIO()
         wb.save(buffer)
         excel_data = buffer.getvalue()
@@ -214,11 +233,7 @@ class ReportDownloadExcelView(generics.GenericAPIView):
         response.write(excel_data)
         return response
 
-
-
 class ReportDownloadAllPDFView(generics.GenericAPIView):
-    # permission_classes = [IsAuthenticated]
-
     def get(self, request):
         reports = Report.objects.all()
         response = HttpResponse(content_type='application/pdf')
@@ -228,16 +243,13 @@ class ReportDownloadAllPDFView(generics.GenericAPIView):
         doc = SimpleDocTemplate(buffer, pagesize=letter)
         elements = []
 
-        # Add table headers
-        headers = ["ID", "User", "Level", "Title", "Description", "Created Date"]
+        headers = ["ID", "Created By", "Level", "Title", "Description", "Created Date"]
         data = [headers]
 
-        # Add report data
         for report in reports:
-            row = [report.id, report.user.username, report.level, report.title, report.description, report.created_date]
+            row = [report.id, report.created_by.username, report.level, report.title, report.description, report.created_date]
             data.append(row)
 
-        # Generate PDF table
         table = Table(data)
         table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -255,10 +267,7 @@ class ReportDownloadAllPDFView(generics.GenericAPIView):
         response.write(pdf)
         return response
 
-
 class ReportDownloadAllExcelView(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-
     def get(self, request):
         reports = Report.objects.all()
         response = HttpResponse(content_type='application/vnd.ms-excel')
@@ -268,16 +277,13 @@ class ReportDownloadAllExcelView(generics.GenericAPIView):
         ws = wb.active
         ws.title = "All Reports"
 
-        # Add headers
-        headers = ["ID", "User", "Level", "Title", "Description", "Created Date"]
+        headers = ["ID", "Created By", "Level", "Title", "Description", "Created Date"]
         ws.append(headers)
 
-        # Add report data
         for report in reports:
-            row = [report.id, report.user.username, report.level, report.title, report.description, report.created_date]
+            row = [report.id, report.created_by.username, report.level, report.title, report.description, report.created_date]
             ws.append(row)
 
-        # Set column width and alignment
         for col in ws.columns:
             max_length = 0
             column = col[0].column_letter
@@ -301,3 +307,29 @@ class ReportDownloadAllExcelView(generics.GenericAPIView):
 '''
     reports done to be developed with the reports
 '''
+
+
+
+
+class ReportsByCreatorView(generics.ListAPIView):
+    serializer_class = ReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user_id = self.kwargs['user_id']
+        return Report.objects.filter(created_by=user_id)
+    
+    
+    
+class ReportsBySubordinatesView(generics.ListAPIView):
+    serializer_class = ReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        creator_id = self.kwargs['creator_id']
+        try:
+            creator_user = CustomUser.objects.get(id=creator_id)
+            subordinates = CustomUser.objects.filter(created_by=creator_user)  # Assuming 'manager' is the field linking to a user's manager
+            return Report.objects.filter(created_by__in=subordinates)
+        except CustomUser.DoesNotExist:
+            return Report.objects.none()

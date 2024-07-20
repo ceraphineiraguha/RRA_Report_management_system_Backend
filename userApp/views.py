@@ -12,7 +12,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from .models import CustomUser
 from .serializers import (
-    UserSerializer, SignupSerializer, LoginSerializer,
+    LogoutSerializer, UserSerializer, SignupSerializer, LoginSerializer,
     PasswordResetSerializer, UpdateUsernameSerializer
 )
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -22,11 +22,33 @@ from rest_framework_simplejwt.tokens import RefreshToken
 def index(request):
     return Response({"message": "Welcome to RRA Report Management System"}, status=status.HTTP_200_OK)
 
+
+
+
+from rest_framework.response import Response
+from rest_framework import status
+import logging
+
+logger = logging.getLogger(__name__)
+
 class SignupView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = SignupSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
+    def perform_create(self, serializer):
+        try:
+            serializer.save(created_by=self.request.user)
+        except Exception as e:
+            logger.error(f"Error during user creation: {e}")
+            raise e
+
+    def create(self, request, *args, **kwargs):
+        logger.info(f"Request data: {request.data}")
+        return super().create(request, *args, **kwargs)
+
+        
+        
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -35,16 +57,34 @@ class LoginView(APIView):
         if serializer.is_valid():
             username = serializer.validated_data['username']
             password = serializer.validated_data['password']
+
+            # Authenticate user with both username and password
             user = authenticate(username=username, password=password)
+            
             if user is not None:
+                # Authentication successful, generate tokens
                 refresh = RefreshToken.for_user(user)
                 return Response({
                     'refresh': str(refresh),
                     'access': str(refresh.access_token),
+                    'role': user.role,
+                    'id': user.id,
                 }, status=status.HTTP_200_OK)
-            return Response({"error": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                # User authentication failed
+                # Check if the user exists to provide specific error message
+                if not user_exists(username):
+                    return Response({"error": "Username not found"}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response({"error": "Wrong password"}, status=status.HTTP_400_BAD_REQUEST)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+def user_exists(username):
+    return CustomUser.objects.filter(username=username).exists()
+
+
+    
 class UserListView(generics.ListAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
@@ -105,6 +145,8 @@ class UserByLastNameView(generics.ListAPIView):
         last_name = self.kwargs['last_name']
         return CustomUser.objects.filter(last_name__icontains=last_name)
 
+
+
 class PasswordResetView(APIView):
     permission_classes = [AllowAny]
 
@@ -113,20 +155,22 @@ class PasswordResetView(APIView):
         if serializer.is_valid():
             username = serializer.validated_data.get('username')
             email = serializer.validated_data.get('email')
-            phone = serializer.validated_data.get('phone')
-            
-            
+            new_password = serializer.validated_data.get('new_password')
+
             user = None
             if username:
                 user = CustomUser.objects.filter(username=username).first()
-            elif email:
-                user = CustomUser.objects.filter(email=email).first()
-            elif phone:
-                user = CustomUser.objects.filter(phone=phone).first()
+                if not user:
+                    return Response({"error": "Username not found"}, status=status.HTTP_404_NOT_FOUND)
+            if email:
+                user_by_email = CustomUser.objects.filter(email=email).first()
+                if not user_by_email:
+                    return Response({"error": "Email not found"}, status=status.HTTP_404_NOT_FOUND)
+                if user and user != user_by_email:
+                    return Response({"error": "Username and email do not match"}, status=status.HTTP_400_BAD_REQUEST)
+                user = user_by_email
 
             if user:
-                # new_password = self.generate_random_string(6)
-                new_password = request.data.get('new_password')
                 user.set_password(new_password)
                 user.save()
 
@@ -137,12 +181,7 @@ class PasswordResetView(APIView):
 
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def generate_random_string(self, length):
-        import random
-        import string
-        return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
-    
+
     def send_credentials(self, email, username, new_password):
         from django.core.mail import send_mail
         send_mail(
@@ -152,6 +191,9 @@ class PasswordResetView(APIView):
             [email],
             fail_silently=False,
         )
+
+
+
 
 class UpdateUsernameView(APIView):
     permission_classes = [IsAuthenticated]
@@ -296,3 +338,89 @@ class UserDownloadExcelView(APIView):
 
         response.write(buffer.read())
         return response
+    
+    
+    
+    
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.response import Response
+from rest_framework import status
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = LogoutSerializer(data=request.data)
+        if serializer.is_valid():
+            refresh_token = serializer.validated_data['refresh_token']
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+                return Response({"message": "Logout successful"}, status=status.HTTP_205_RESET_CONTENT)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+from .serializers import CustomUserSerializer
+
+class CreatedUsersListView(generics.ListAPIView):
+    serializer_class = CustomUserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = CustomUser.objects.filter(created_by=user)
+        
+        # Log the queryset to the terminal for debugging
+        print("Retrieved Users:")
+        for user in queryset:
+            print(f"ID: {user.id}, First Name: {user.first_name}, Last Name: {user.last_name}, Email: {user.email}, Phone: {user.phone}, Role: {user.role}")
+
+        return queryset
+    
+    
+from django.core.mail import send_mail
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import ContactUsSerializer
+
+@api_view(['POST'])
+def contact_us(request):
+    serializer = ContactUsSerializer(data=request.data)
+    if serializer.is_valid():
+        names = serializer.validated_data['name']
+        email = serializer.validated_data['email']
+        subject = serializer.validated_data['subject']
+        description = serializer.validated_data['description']
+        
+        # Check for empty fields
+        if not names.strip():
+            return Response({"error": "Name field cannot be empty."}, status=status.HTTP_400_BAD_REQUEST)
+        if not subject.strip():
+            return Response({"error": "Subject field cannot be empty."}, status=status.HTTP_400_BAD_REQUEST)
+        if not description.strip():
+            return Response({"error": "Description field cannot be empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate email format
+        try:
+            validate_email(email)
+        except ValidationError:
+            return Response({"error": "Invalid email format."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Sending email
+        send_mail(
+            subject=f"Contact Us: {subject}",
+            message=f"Name: {names}\nEmail: {email}\n\nDescription:\n{description}",
+            from_email=email,
+            recipient_list=['princemugabe567@gmail.com'],
+            fail_silently=False,
+        )
+        return Response({"message": "Email sent successfully."}, status=status.HTTP_200_OK)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

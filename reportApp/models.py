@@ -9,11 +9,12 @@ class Report(models.Model):
         ('division', 'Division Level'),
     )
 
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)  # Correct field name
+    created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     level = models.CharField(max_length=20, choices=LEVEL_CHOICES)
     title = models.CharField(max_length=100)
     description = models.TextField()
     created_date = models.DateTimeField(auto_now_add=True)
+    status = models.BooleanField(default=False)
 
     def __str__(self):
         return self.title

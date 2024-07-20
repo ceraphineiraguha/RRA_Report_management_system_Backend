@@ -3,7 +3,7 @@ from .views import (
     index, SignupView, LoginView, UserListView, UserDetailView,
     UserUpdateView, UserDeleteView, UserByUsernameView, UserByEmailView,
     UserByPhoneView, UserByFirstNameView, UserByLastNameView, PasswordResetView,
-    UpdateUsernameView, UserCountView, UserTrendView, UserDownloadPDFView, UserDownloadExcelView
+    UpdateUsernameView, UserCountView, UserTrendView, UserDownloadPDFView, UserDownloadExcelView, LogoutView, CreatedUsersListView, contact_us
 )
 
 urlpatterns = [
@@ -19,10 +19,15 @@ urlpatterns = [
     path('find_user/phone/<str:phone>/', UserByPhoneView.as_view(), name='user-by-phone'),
     path('find_user/firstname/<str:first_name>/', UserByFirstNameView.as_view(), name='user-by-firstname'),
     path('find_user/lastname/<str:last_name>/', UserByLastNameView.as_view(), name='user-by-lastname'),
-    path('password-reset/', PasswordResetView.as_view(), name='password-reset'),
+    path('reset_password/', PasswordResetView.as_view(), name='password-reset'),
     path('update-username/', UpdateUsernameView.as_view(), name='update-username'),
     path('user-count/', UserCountView.as_view(), name='user-count'),
     path('user-trends/', UserTrendView.as_view(), name='user-trends'),
     path('users/download/pdf/', UserDownloadPDFView.as_view(), name='user-download-pdf'),
     path('users/download/excel/', UserDownloadExcelView.as_view(), name='user-download-excel'),
+    path('logout/', LogoutView.as_view(), name='logout'),
+    
+    
+    path('created-users/', CreatedUsersListView.as_view(), name='created-users-list'),
+    path('contact/', contact_us, name='contact_us'),
 ]
