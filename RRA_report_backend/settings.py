@@ -1,9 +1,12 @@
 import dj_database_url
 from pathlib import Path
 from datetime import timedelta
+import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+env = environ.Env()
+environ.Env.read_env()
 
 SECRET_KEY = 'r^2y10j(6b&kqp4e=&f8!&7wl)!uvf2mh!$mwc@o_voj77m2%('
 
@@ -57,15 +60,19 @@ TEMPLATES = [
 WSGI_APPLICATION = 'RRA_report_backend.wsgi.application'
 
 
+# DATABASES = {
+#     'default': {
+#             'ENGINE': 'django.db.backends.mysql',
+#             'NAME': 'rra_report_db',
+#             'USER': 'root',
+#             'PASSWORD': '',
+#             'HOST': 'localhost',
+#             'PORT': '3306',
+#         }
+# }
+
 DATABASES = {
-    'default': {
-            'ENGINE': 'django.db.backends.mysql',
-            'NAME': 'rra_report_db',
-            'USER': 'root',
-            'PASSWORD': '',
-            'HOST': 'localhost',
-            'PORT': '3306',
-        }
+    'default': dj_database_url.parse(env('DATABASE_URL'))
 }
 
 
@@ -115,13 +122,15 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
 
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5000',
-    'http://localhost:5500',
-]
+# CORS_ALLOWED_ORIGINS = [
+#     'http://localhost:3000',
+#     'http://localhost:5000',
+#     'http://localhost:5500',
+# ]
 
+#allow all frontend hosts to access this backend
 CORS_ALLOW_ALL_ORIGINS = True
+
 
 AUTH_USER_MODEL = 'userApp.CustomUser'
 
