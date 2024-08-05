@@ -107,8 +107,8 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'princemugabe567@gmail.com'
-EMAIL_HOST_PASSWORD = 'mzij rnht gyvb xzkk'
+EMAIL_HOST_USER = 'seraphineiraguha40@gmail.com'
+EMAIL_HOST_PASSWORD = 'dcsf rcof mllm npza'
 DEFAULT_FROM_EMAIL = 'no-reply'
 
 REST_FRAMEWORK = {
